@@ -1,0 +1,6 @@
+board:
+  name: ebyte_e73_custom
+  vendor: ebyte
+  socs:
+  - name: nrf52832
+  - name: nrf52840

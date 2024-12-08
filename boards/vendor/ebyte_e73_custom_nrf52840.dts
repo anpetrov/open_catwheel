@@ -1,0 +1,182 @@
+/dts-v1/;
+#include <nordic/nrf52840_qiaa.dtsi>
+#include "ebyte_e73_custom_nrf52840-pinctrl.dtsi"
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+
+/ {
+	model = "EBYTE E73-TBB NRF52840";
+	compatible = "ebyte,e73-tbb-nrf52840";
+
+	chosen {
+		zephyr,console = &uart0;
+		zephyr,shell-uart = &uart0;
+		zephyr,uart-mcumgr = &uart0;
+		zephyr,bt-mon-uart = &uart0;
+		zephyr,bt-c2h-uart = &uart0;
+		zephyr,sram = &sram0;
+		zephyr,flash = &flash0;
+		zephyr,code-partition = &slot0_partition;
+		zephyr,ieee802154 = &ieee802154;
+		zephyr,ot-uart = &uart0;
+	};
+
+	leds {
+		compatible = "gpio-leds";
+		led0: led_0 {
+			gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;
+			label = "Red LED1";
+		};
+		led1: led_1 {
+			gpios = <&gpio0 18 GPIO_ACTIVE_LOW>;
+			label = "Red LED2";
+		};
+	};
+
+	pwmleds {
+		compatible = "pwm-leds";
+		pwm_led0: pwm_led_0 {
+			pwms = <&pwm0 0 PWM_MSEC(20) PWM_POLARITY_INVERTED>;
+		};
+	};
+
+	buttons {
+		compatible = "gpio-keys";
+		button0: button_0 {
+			gpios = <&gpio0 14 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Push button SW1";
+			zephyr,code = <INPUT_KEY_0>;
+		};
+		button1: button_1 {
+			gpios = <&gpio0 13 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Push button SW2";
+			zephyr,code = <INPUT_KEY_1>;
+		};
+	};
+
+	/* These aliases are provided for compatibility with samples */
+	aliases {
+		led0 = &led0;
+		led1 = &led1;
+		pwm-led0 = &pwm_led0;
+		sw0 = &button0;
+		sw1 = &button1;
+		bootloader-led0 = &led0;
+		watchdog0 = &wdt0;
+	};
+};
+
+&adc {
+	status = "okay";
+};
+
+&uicr {
+	gpio-as-nreset;
+};
+
+&gpiote {
+	status = "okay";
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
+&uart0 {
+	status = "okay";
+	compatible = "nordic,nrf-uarte";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart0_default>;
+	pinctrl-1 = <&uart0_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+&pwm0 {
+	status = "okay";
+	pinctrl-0 = <&pwm0_default>;
+	pinctrl-1 = <&pwm0_sleep>;
+	pinctrl-names = "default", "sleep";
+};
+
+&flash0 {
+
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x00000000 0xc000>;
+		};
+		slot0_partition: partition@c000 {
+			label = "image-0";
+			reg = <0x0000C000 0x64000>;
+		};
+		slot1_partition: partition@70000 {
+			label = "image-1";
+			reg = <0x00070000 0x64000>;
+		};
+		scratch_partition: partition@D4000 {
+			label = "image-scratch";
+			reg = <0x000D4000 0xa000>;
+		};
+		storage_partition: partition@DE000 {
+			label = "storage";
+			reg = <0x000DE000 0x00006000>;
+		};
+	};
+};
+
+&ieee802154 {
+	status = "okay";
+};
+
+zephyr_udc0: &usbd {
+	compatible = "nordic,nrf-usbd";
+	status = "disabled";
+};
+
+&uart0 {
+	status = "okay";
+	hw-flow-control;
+};
+
+/ {
+	/*
+	* In some default configurations within the nRF Connect SDK,
+	* e.g. on nRF52840, the chosen zephyr,entropy node is &cryptocell.
+	* This devicetree overlay ensures that default is overridden wherever it
+	* is set, as this application uses the RNG node for entropy exclusively.
+	*/
+	chosen {
+		zephyr,entropy = &rng;
+	};
+};
+
+/ {
+    zephyr,user {
+	io-channels = <&adc 0>;
+zopa;
+    };
+};
+
+&adc {
+    #address-cells = <1>;
+    #size-cells = <0>;
+    status="okay";
+
+    channel@0 {
+	reg = <0>;
+	zephyr,gain = "ADC_GAIN_1_2";
+	zephyr,reference = "ADC_REF_INTERNAL";
+	zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+	zephyr,input-positive = <NRF_SAADC_VDDHDIV5>;
+	zephyr,resolution = <12>;
+	zephyr,oversampling = <4>;
+    };
+};
+
