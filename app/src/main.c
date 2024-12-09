@@ -362,7 +362,7 @@ static int start_app(void)
 		}
 		LOG_INF("done publishing..");
 		uint32_t triggers = atomic_get(&g_triggers);
-//		settings_save_one("foo/triggers", &triggers, sizeof(triggers));
+		settings_save_one("foo/triggers", &triggers, sizeof(triggers));
 		LOG_ERR("batt level %d", battery_level());
 
 	}
