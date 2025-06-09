@@ -19,7 +19,7 @@ The sensor publishes number of detections on `homeassistant/sensor/catwheel/stat
 HA can auto-create mqtt sensors, so the following example configuration can be used:
 
 ```
-  mosquitto_pub -r -h HOME_ASSISTANT_IP -p 1883 -t "homeassistant/sensor/catwheel/config" -m
+  mosquitto_pub -r -h MQTT_SERVER_IP -p 1883 -t "homeassistant/sensor/catwheelD/config" -f
   {
     "device_class":"distance",
     "state_topic":"homeassistant/sensor/catwheel/state",
@@ -30,23 +30,25 @@ HA can auto-create mqtt sensors, so the following example configuration can be u
        "identifiers":[
            "cat_wheel_01"
        ],
-       "name":"cat wheel steps"
+       "name":"cat wheel"
     }
-}
+ }
+
 ```
-Also, separate sensor for voltage:
+Also, separate sensor for weight:
 ```
+  mosquitto_pub -r -h MQTT_SERVER_IP -p 1883 -t "homeassistant/sensor/catwheelW/config" -f f1
   {
-    "device_class":"voltage",
-    "state_topic":"homeassistant/sensor/catwheel_voltage/state",
-    "unit_of_measurement":"mV",
-    "value_template":"{{ value_json.voltage}}",
-    "unique_id":"cat_wheel_01_voltage",
+    "device_class":"weight",
+    "state_topic":"homeassistant/sensor/catwheel/state",
+    "unit_of_measurement":"g",
+    "value_template":"{{ value_json.weight}}",
+    "unique_id":"cat_wheel_02",
     "device":{
        "identifiers":[
-           "cat_wheel_01_voltage"
+           "cat_wheel_01"
        ],
-       "name":"cat wheel voltage"
+       "name":"cat wheel"
     }
 }
 ```

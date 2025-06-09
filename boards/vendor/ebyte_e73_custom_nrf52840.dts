@@ -115,6 +115,7 @@ zephyr_udc0: &usbd {
 / {
     zephyr,user {
 	io-channels = <&adc 0>;
+	hx711_power-gpios = <&gpio1 11 GPIO_ACTIVE_HIGH >;
     };
 };
 
@@ -140,4 +141,15 @@ zephyr_udc0: &usbd {
 
 &reg1 {
 	regulator-initial-mode = <NRF5X_REG_MODE_DCDC>;
+};
+
+
+/{
+	hx711 {
+		compatible = "avia,hx711";
+		status = "okay";
+		label = "HX711";
+		dout-gpios = <&gpio0 3 (GPIO_ACTIVE_HIGH | GPIO_PULL_UP) >;
+		sck-gpios = <&gpio0 30 GPIO_ACTIVE_HIGH>;
+	};
 };

@@ -13,5 +13,10 @@ manifest:
     - name: nrf
       remote: ncs
       repo-path: sdk-nrf
-      revision: main
+      revision: e61c2baaac25b5ac2af4ade25209d775ca2a1138
       import: true
+
+    - name: HX711
+      path: modules/HX711
+      revision: refs/tags/zephyr-v3.2.0
+      url: https://github.com/nobodyguy/HX711_zephyr_driver

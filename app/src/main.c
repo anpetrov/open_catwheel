@@ -15,6 +15,12 @@ LOG_MODULE_REGISTER(net_mqtt_publisher_sample, LOG_LEVEL_DBG);
 #include <zephyr/drivers/adc.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/sys/atomic.h>
+#include <zephyr/shell/shell.h>
+
+#include <zephyr/drivers/sensor.h>
+#include <zephyr/sys/util.h>
+#include <zephyr/types.h>
+#include <sensor/hx711/hx711.h>
 
 #include <string.h>
 #include <errno.h>
@@ -22,6 +28,7 @@ LOG_MODULE_REGISTER(net_mqtt_publisher_sample, LOG_LEVEL_DBG);
 
 #include "config.h"
 
+int32_t measure(const struct device *scale_dev);
 
 /* Buffers for MQTT client. */
 static uint8_t rx_buffer[APP_MQTT_BUFFER_SIZE];
@@ -41,9 +48,89 @@ static bool connected;
 #define GPIO_DATA_PIN 5
 #define GPIO_NAME "foo"
 
+static const struct gpio_dt_spec hx711_pwr = GPIO_DT_SPEC_GET(DT_PATH(zephyr_user), hx711_power_gpios);
+
 atomic_t g_triggers = ATOMIC_INIT(0x0);
+int32_t g_weight = 0;
+
 K_EVENT_DEFINE(motion_detected);
 
+void scale_power(bool on)
+{
+    if (on) {
+	gpio_pin_set_dt(&hx711_pwr, 1);
+	// datasheets says 400 ms typ
+	k_sleep(K_MSEC(500));
+    } else {
+	gpio_pin_set_dt(&hx711_pwr, 0);
+    }
+}
+
+void tare_work_handler(struct k_work *work)
+{
+	LOG_INF("taring..");
+	const struct device *hx711_dev = DEVICE_DT_GET_ANY(avia_hx711);
+
+
+	int32_t cur_weight = measure(hx711_dev);
+	if (cur_weight == 0) {
+		LOG_ERR("0 weight skipping tarring!");
+		return;
+	}
+
+	if (abs(cur_weight) > 2000) {
+		LOG_ERR("weight of %d detected, aborting tare!", cur_weight);
+		return;
+	}
+
+	scale_power(1);
+	uint32_t tare = avia_hx711_tare(hx711_dev, 5);
+	LOG_INF("new tare = %d", tare);
+	scale_power(0);
+}
+
+static int cmd_tare(const struct shell *sh,
+			  size_t argc, char *argv[])
+{
+	scale_power(1);
+	const struct device *hx711_dev = DEVICE_DT_GET_ANY(avia_hx711);
+	uint32_t tare = avia_hx711_tare(hx711_dev, 5);
+	LOG_INF("new tare = %d", tare);
+	scale_power(0);
+	return 0;
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(tare_command,
+	SHELL_CMD(tare, NULL,
+		  "Tare the device\n",
+		  cmd_tare),
+	SHELL_SUBCMD_SET_END
+);
+
+SHELL_CMD_REGISTER(sample, &tare_command,
+		   "trigger tare", NULL);
+
+
+K_WORK_DEFINE(tare_work, tare_work_handler);
+void tare_timer_handler(struct k_timer *dummy)
+{
+	k_work_submit(&tare_work);
+}
+
+K_TIMER_DEFINE(tare_timer, tare_timer_handler, NULL);
+
+static int cmd_autotare(const struct shell *sh,
+			  size_t argc, char *argv[])
+{
+	k_work_submit(&tare_work);
+}
+
+SHELL_STATIC_SUBCMD_SET_CREATE(autotare_command,
+	SHELL_CMD(autotare, NULL,
+		  "Auto tare the device\n",
+		  cmd_autotare),
+	SHELL_SUBCMD_SET_END
+);
 
 
 static void cooldown_expired(struct k_work *work)
@@ -160,7 +247,7 @@ void mqtt_evt_handler(struct mqtt_client *const client,
 static char *get_mqtt_payload(enum mqtt_qos qos)
 {
 	static char payload[64] = {0};
-	snprintf(payload, sizeof(payload), "{\"distance\": %ld}", atomic_get(&g_triggers));
+	snprintf(payload, sizeof(payload), "{\"distance\": %ld, \"weight\": %i}", atomic_get(&g_triggers), g_weight);
 
 	return payload;
 }
@@ -351,6 +438,8 @@ static int start_app(void)
 		{
 			LOG_ERR("end of universe and no event :(");
 		}
+		const struct device *hx711_dev = DEVICE_DT_GET_ANY(avia_hx711);
+		g_weight = measure(hx711_dev);
 		LOG_INF("publishing data..");
 		while (!CONFIG_NET_SAMPLE_APP_MAX_CONNECTIONS ||
 		       i++ < CONFIG_NET_SAMPLE_APP_MAX_CONNECTIONS) {
@@ -452,9 +541,50 @@ int32_t battery_level(void) {
     return val_mv;
 }
 
+static void gpio_output_voltage_setup(void)
+{
+    // Configure UICR_REGOUT0 register only if it is set to default value.
+    if ((NRF_UICR->REGOUT0 & UICR_REGOUT0_VOUT_Msk) ==
+        (UICR_REGOUT0_VOUT_DEFAULT << UICR_REGOUT0_VOUT_Pos))
+    {
+        NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Wen;
+        while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+
+        NRF_UICR->REGOUT0 = (NRF_UICR->REGOUT0 & ~((uint32_t)UICR_REGOUT0_VOUT_Msk)) |
+                            (UICR_REGOUT0_VOUT_3V3 << UICR_REGOUT0_VOUT_Pos);
+
+        NRF_NVMC->CONFIG = NVMC_CONFIG_WEN_Ren;
+        while (NRF_NVMC->READY == NVMC_READY_READY_Busy){}
+
+        // System reset is needed to update UICR registers.
+        NVIC_SystemReset();
+    }
+}
+
+
+int32_t measure(const struct device *scale_dev)
+{
+	static struct sensor_value weight;
+	int ret = 0;
+
+	scale_power(1);
+	ret = sensor_sample_fetch(scale_dev);
+	scale_power(0);
+	if (ret != 0) {
+		LOG_ERR("Cannot take measurement: %d", ret);
+		return 0;
+	}
+
+	sensor_channel_get(scale_dev, HX711_SENSOR_CHAN_WEIGHT, &weight);
+	LOG_INF("Weight: %d.%06d grams", weight.val1, weight.val2);
+	return weight.val1;
+}
+
 int main(void)
 {
 	const struct device *gpio_dev;
+
+	gpio_output_voltage_setup();
 
 	settings_subsys_init();
 	settings_register(&my_conf);
@@ -484,11 +614,15 @@ int main(void)
 
 	gpio_init_callback(&gpio_cb, button_cb, BIT(GPIO_DATA_PIN));
 	gpio_add_callback(gpio_dev, &gpio_cb);
+
+	gpio_pin_configure_dt(&hx711_pwr, GPIO_OUTPUT_INACTIVE);
+
 //	wait_for_network();
 //	while (true) {
 //		LOG_ERR("batt level %d", battery_level());
 //		k_sleep(K_MSEC(500));
 //	}
+	k_timer_start(&tare_timer, K_SECONDS(10), K_HOURS(10));
 	exit(start_app());
 	return 0;
 }
