@@ -100,18 +100,26 @@ static int cmd_tare(const struct shell *sh,
 	return 0;
 }
 
+K_WORK_DEFINE(tare_work, tare_work_handler);
+static int cmd_autotare(const struct shell *sh,
+			  size_t argc, char *argv[])
+{
+	k_work_submit(&tare_work);
+}
+
 SHELL_STATIC_SUBCMD_SET_CREATE(tare_command,
 	SHELL_CMD(tare, NULL,
 		  "Tare the device\n",
 		  cmd_tare),
+	SHELL_CMD(autotare, NULL,
+		  "Auto tare the device\n",
+		  cmd_autotare),
 	SHELL_SUBCMD_SET_END
 );
 
 SHELL_CMD_REGISTER(sample, &tare_command,
 		   "trigger tare", NULL);
 
-
-K_WORK_DEFINE(tare_work, tare_work_handler);
 void tare_timer_handler(struct k_timer *dummy)
 {
 	k_work_submit(&tare_work);
@@ -119,18 +127,6 @@ void tare_timer_handler(struct k_timer *dummy)
 
 K_TIMER_DEFINE(tare_timer, tare_timer_handler, NULL);
 
-static int cmd_autotare(const struct shell *sh,
-			  size_t argc, char *argv[])
-{
-	k_work_submit(&tare_work);
-}
-
-SHELL_STATIC_SUBCMD_SET_CREATE(autotare_command,
-	SHELL_CMD(autotare, NULL,
-		  "Auto tare the device\n",
-		  cmd_autotare),
-	SHELL_SUBCMD_SET_END
-);
 
 
 static void cooldown_expired(struct k_work *work)
