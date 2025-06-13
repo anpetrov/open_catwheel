@@ -21,14 +21,12 @@ static void on_thread_state_changed(otChangedFlags flags, struct openthread_cont
 		printk("role change\n");
 		if (otThreadGetDeviceRole(ot_context->instance) == OT_DEVICE_ROLE_CHILD) {
 			printk("to child!\n");
-#ifdef disabled
 			const struct device *cons = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
 
 			if (!device_is_ready(cons)) {
 				return;
 			}
 			pm_device_action_run(cons, PM_DEVICE_ACTION_SUSPEND);
-#endif
 #if defined(CONFIG_RAM_POWER_DOWN_LIBRARY)
 			power_down_unused_ram();
 #endif
