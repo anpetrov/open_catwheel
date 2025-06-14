@@ -18,9 +18,7 @@ static void on_thread_state_changed(otChangedFlags flags, struct openthread_cont
 				    void *user_data)
 {
 	if (flags & OT_CHANGED_THREAD_ROLE) {
-		printk("role change\n");
 		if (otThreadGetDeviceRole(ot_context->instance) == OT_DEVICE_ROLE_CHILD) {
-			printk("to child!\n");
 			const struct device *cons = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
 
 			if (!device_is_ready(cons)) {
@@ -40,6 +38,5 @@ static struct openthread_state_changed_cb ot_state_chaged_cb = {
 
 void low_power_enable(void)
 {
-	printk("lpe!\n");
 	openthread_state_changed_cb_register(openthread_get_default_context(), &ot_state_chaged_cb);
 }

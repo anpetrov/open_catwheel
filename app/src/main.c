@@ -1,11 +1,5 @@
-/*
- * Copyright (c) 2017 Intel Corporation
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(net_mqtt_publisher_sample, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(open_catwheel, LOG_LEVEL_DBG);
 
 #include <zephyr/drivers/adc.h>
 #include <zephyr/drivers/gpio.h>
@@ -106,7 +100,7 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
     SHELL_CMD(autotare, NULL, "Auto tare the device\n", cmd_autotare),
     SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(sample, &tare_command, "trigger tare", NULL);
+SHELL_CMD_REGISTER(scale, &tare_command, "trigger tare", NULL);
 
 void tare_timer_handler(struct k_timer *dummy) { k_work_submit(&tare_work); }
 
@@ -424,7 +418,7 @@ static int start_app(void) {
   return 0;
 }
 
-static void button_cb(const struct device *port, struct gpio_callback *cb,
+static void magnet_cb(const struct device *port, struct gpio_callback *cb,
                       gpio_port_pins_t pins) {
   atomic_inc(&g_triggers);
   k_work_reschedule(&cooldown_work, K_MSEC(3000));
@@ -570,7 +564,7 @@ int main(void) {
 
   static struct gpio_callback gpio_cb;
 
-  gpio_init_callback(&gpio_cb, button_cb, BIT(GPIO_DATA_PIN));
+  gpio_init_callback(&gpio_cb, magnet_cb, BIT(GPIO_DATA_PIN));
   gpio_add_callback(gpio_dev, &gpio_cb);
 
   gpio_pin_configure_dt(&hx711_pwr, GPIO_OUTPUT_INACTIVE);
