@@ -60,25 +60,35 @@ void scale_power(bool on) {
   }
 }
 
+K_MUTEX_DEFINE(scale_mutex);
+
 void tare_work_handler(struct k_work *work) {
-  LOG_INF("taring..");
   const struct device *hx711_dev = DEVICE_DT_GET_ANY(avia_hx711);
+  LOG_INF("taring..");
+
+  if (k_mutex_lock(&scale_mutex, K_NO_WAIT) != 0) {
+    // it is already measuring, skip tarring
+    LOG_ERR("scale in use, aborting tare!");
+    return;
+  }
 
   int32_t cur_weight = measure(hx711_dev);
   if (cur_weight == 0) {
     LOG_ERR("0 weight skipping tarring!");
-    return;
+    goto out;
   }
 
   if (abs(cur_weight) > 2000) {
     LOG_ERR("weight of %d detected, aborting tare!", cur_weight);
-    return;
+    goto out;
   }
 
   scale_power(1);
   uint32_t tare = avia_hx711_tare(hx711_dev, 5);
   LOG_INF("new tare = %d", tare);
   scale_power(0);
+out:
+  k_mutex_unlock(&scale_mutex);
 }
 
 static int cmd_tare(const struct shell *sh, size_t argc, char *argv[]) {
@@ -400,7 +410,13 @@ static int start_app(void) {
       LOG_ERR("end of universe and no event :(");
     }
     const struct device *hx711_dev = DEVICE_DT_GET_ANY(avia_hx711);
-    g_weight = measure(hx711_dev);
+
+    if (k_mutex_lock(&scale_mutex, K_NO_WAIT) == 0) {
+       // it is not tarring
+       g_weight = measure(hx711_dev);
+       k_mutex_unlock(&scale_mutex);
+    }
+
     LOG_INF("publishing data..");
     while (!CONFIG_NET_SAMPLE_APP_MAX_CONNECTIONS ||
            i++ < CONFIG_NET_SAMPLE_APP_MAX_CONNECTIONS) {
@@ -574,7 +590,7 @@ int main(void) {
   //		LOG_ERR("batt level %d", battery_level());
   //		k_sleep(K_MSEC(500));
   //	}
-  k_timer_start(&tare_timer, K_SECONDS(10), K_HOURS(10));
+  k_timer_start(&tare_timer, K_SECONDS(10), K_HOURS(1));
   exit(start_app());
   return 0;
 }
