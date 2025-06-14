@@ -47,6 +47,7 @@ static const struct gpio_dt_spec hx711_pwr =
 
 atomic_t g_triggers = ATOMIC_INIT(0x0);
 int32_t g_weight = 0;
+bool g_first_tare = true;
 
 K_EVENT_DEFINE(motion_detected);
 
@@ -64,7 +65,7 @@ K_MUTEX_DEFINE(scale_mutex);
 
 void tare_work_handler(struct k_work *work) {
   const struct device *hx711_dev = DEVICE_DT_GET_ANY(avia_hx711);
-  LOG_INF("taring..");
+  LOG_INF("taring, first tare: %d", g_first_tare);
 
   if (k_mutex_lock(&scale_mutex, K_NO_WAIT) != 0) {
     // it is already measuring, skip tarring
@@ -78,15 +79,17 @@ void tare_work_handler(struct k_work *work) {
     goto out;
   }
 
-  if (abs(cur_weight) > 2000) {
+  if (abs(cur_weight) > 2000 && !g_first_tare) {
     LOG_ERR("weight of %d detected, aborting tare!", cur_weight);
     goto out;
   }
 
   scale_power(1);
   uint32_t tare = avia_hx711_tare(hx711_dev, 5);
-  LOG_INF("new tare = %d", tare);
+  LOG_INF("new auto tare = %d", tare);
   scale_power(0);
+  if (g_first_tare)
+    g_first_tare = false;
 out:
   k_mutex_unlock(&scale_mutex);
 }
@@ -95,7 +98,7 @@ static int cmd_tare(const struct shell *sh, size_t argc, char *argv[]) {
   scale_power(1);
   const struct device *hx711_dev = DEVICE_DT_GET_ANY(avia_hx711);
   uint32_t tare = avia_hx711_tare(hx711_dev, 5);
-  LOG_INF("new tare = %d", tare);
+  LOG_INF("manual new tare = %d", tare);
   scale_power(0);
   return 0;
 }
