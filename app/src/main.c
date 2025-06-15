@@ -588,11 +588,6 @@ int main(void) {
 
   gpio_pin_configure_dt(&hx711_pwr, GPIO_OUTPUT_INACTIVE);
 
-  //	wait_for_network();
-  //	while (true) {
-  //		LOG_ERR("batt level %d", battery_level());
-  //		k_sleep(K_MSEC(500));
-  //	}
   k_timer_start(&tare_timer, K_SECONDS(10), K_HOURS(1));
   exit(start_app());
   return 0;

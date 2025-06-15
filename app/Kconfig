@@ -1,9 +1,4 @@
-# Config options for mqtt_publisher sample application
-
-# Copyright (c) 2020 Intel Corporation
-# SPDX-License-Identifier: Apache-2.0
-
-mainmenu "Networking mqtt_publisher sample application"
+mainmenu "Open catwheel application"
 
 config NET_SAMPLE_APP_MAX_ITERATIONS
 	int "Number of times to Publish sample MQTT messages"
@@ -41,6 +36,5 @@ config BISON_OTA
 	  Enable this option to include MCUmgr in the build which will enable
 	  the Bluetooth transport and image management group, which allows
 	  for firmware over the air update support of the device.
-
 
 source "Kconfig.zephyr"
